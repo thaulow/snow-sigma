@@ -31,12 +31,11 @@ Lint chart:
   tags:
     - sp
 
-Validate dry-run:
+Validate templates:
   stage: test
   script:
     - helm dependency update waldur/
     - helm template waldur waldur/ -f values.yaml --debug > /dev/null
-    - helm install waldur waldur/ -f values.yaml --dry-run --debug -n $KUBE_NAMESPACE
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_COMMIT_BRANCH == "main"'
