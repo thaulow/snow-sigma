@@ -1,0 +1,245 @@
+# Sigma2 Snow - Waldur Helm Chart Values
+# ========================================
+# This file overrides the upstream waldur/values.yaml for the Sigma2 cluster.
+# Deployment: snow.sigma2.no (namespace: snow-ns9999k)
+#
+# Pre-requisite Kubernetes Secrets (must exist in namespace before deploy):
+#
+#   1. waldur-secret-key    - Django secret key
+#      Keys: GLOBAL_SECRET_KEY
+#
+#   2. snow-db               - PostgreSQL credentials (created by Zalando operator)
+#      Keys: username, password
+#
+#   3. waldur-rmq            - RabbitMQ credentials
+#      Keys: rabbitmq-username, rabbitmq-password
+#
+#   4. snow-tls              - TLS certificate for snow.sigma2.no
+#      Keys: tls.crt, tls.key
+#
+# To create secrets (example):
+#   kubectl create secret generic waldur-secret-key \
+#     --from-literal=GLOBAL_SECRET_KEY='<your-secret-key>' -n snow-ns9999k
+#   kubectl create secret generic waldur-rmq \
+#     --from-literal=rabbitmq-username='waldur' \
+#     --from-literal=rabbitmq-password='<your-password>' -n snow-ns9999k
+# ========================================
+
+# --- Replicas ---
+replicaCount:
+  homeport: 1
+  api: 1
+  worker: 1
+
+# --- Hostnames & Scheme ---
+apiScheme: "https"
+homeportScheme: "https"
+apiHostname: snow.sigma2.no
+homeportHostname: snow.sigma2.no
+
+# --- Resources ---
+apiResources:
+  requests:
+    cpu: 200m
+    memory: 1Gi
+  limits:
+    cpu: 400m
+    memory: 2Gi
+
+workerResources:
+  requests:
+    cpu: 200m
+    memory: 1Gi
+  limits:
+    cpu: 400m
+    memory: 3Gi
+
+homeportResources:
+  requests:
+    cpu: 200m
+    memory: 1Gi
+  limits:
+    cpu: 400m
+    memory: 2Gi
+
+beatResources:
+  requests:
+    cpu: 200m
+    memory: 1Gi
+  limits:
+    cpu: 400m
+    memory: 2Gi
+
+# --- HPA (disabled) ---
+hpa:
+  api:
+    enabled: false
+  celery:
+    enabled: false
+
+# --- Ingress ---
+ingress:
+  enabled: true
+  className: "nginx"
+  tls:
+    enabled: true
+    source: "secret"
+    customMastermindSecretName: "snow-tls"
+    customHomeportSecretName: "snow-tls"
+
+# --- Waldur Core ---
+waldur:
+  imageName: "opennode/waldur-mastermind"
+  imageTag: "8.0.5"
+  initdbEnabled: true
+  initdbImageName: "bitnamilegacy/postgresql"
+  pullPolicy: IfNotPresent
+
+  # Reference a pre-existing K8s secret instead of hardcoding
+  secretKey: ""
+  secretKeyExistingSecret:
+    name: "waldur-secret-key"
+    key: "GLOBAL_SECRET_KEY"
+
+  debug: false
+
+  # --- Email ---
+  mail:
+    host: "relayhost.relayhost-ns9999k.svc.cluster.local"  # TODO: update if snow has its own relay
+    port: "25"
+    username: ""
+    password: ""
+    useTLS: "false"
+    useSSL: "false"
+    from: "noreply@sigma2.no"
+    replyTo: "contact@sigma2.no"
+
+  notificationSubject: "Sigma2 Snow Notification"
+  timeZone: "UTC"
+  features: []
+  currencyName: "NOK"
+
+  # --- Site ---
+  site:
+    name: "Sigma2 Snow"
+    logo: "https://snow.sigma2.no/api/icons/sidebar_logo_dark/"
+    email: "contact@sigma2.no"
+
+  defaultLanguage: "nb"
+  languageChoices:
+    - en
+    - et
+    - lt
+    - lv
+    - ru
+    - it
+    - de
+    - da
+    - sv
+    - es
+    - fr
+    - nb
+    - ar
+    - cs
+
+  # --- Auth ---
+  authMethods:
+    - LOCAL_SIGNIN
+
+  # --- Invoice ---
+  invoice:
+    company: "Sigma2 AS"
+    address: "Abels gate 5 C"
+    country: "Norway"
+    email: "contact@sigma2.no"
+    postalCode: "7030"
+    phoneCountryCode: "+47"
+    phoneNationalNumber: "415 69 127"
+
+  invoice_reporting:
+    enabled: true
+    email: "contact@sigma2.no"
+
+  # --- Support (Zammad) ---
+  # NOTE: The upstream chart renders Zammad token directly into a ConfigMap.
+  # There is no existingSecret support for Zammad in the chart templates.
+  # To fully externalize this, the chart would need modification.
+  support:
+    backend: "zammad"
+    zammad:
+      apiUrl: "https://sigma2.zammad.com"
+      token: ""  # Set via --set at deploy time or use a sealed secret overlay
+      group: "Users"
+      articleType: "email"
+      commentCooldownDuration: 5
+
+  # --- Whitelabeling ---
+  whitelabeling:
+    shortPageTitle: "Sigma2 Snow"
+    modePageTitle: "Sigma2 Snow"
+    loginLogoPath: "https://snow.sigma2.no/api/icons/login_logo/"
+    sidebarLogoPath: "https://snow.sigma2.no/api/icons/sidebar_logo_dark/"
+    sidebarStyle: "accent"
+    poweredByLogoPath: "https://snow.sigma2.no/api/icons/powered_by_logo/"
+    faviconPath: "https://snow.sigma2.no/api/icons/favicon"
+    brandColor: "#007890"
+
+  # --- Homeport ---
+  homeport:
+    imageName: "opennode/waldur-homeport"
+    docsLink: "https://www.sigma2.no/documentation/"
+
+  # --- Disabled features ---
+  metricsExporter:
+    enabled: false
+  uvkEverypay:
+    enabled: false
+  marketplace:
+    notify_staff: false
+    script:
+      enabled: false
+
+# --- Network Policy ---
+networkPolicy:
+  enabled: false
+
+# --- External Database (Zalando PostgreSQL) ---
+externalDB:
+  enabled: true
+  flavor: "zalando"
+  secretName: "snow-db"
+  serviceName: "snow-ns9999k-snow.pgsql.svc"
+
+# --- PostgreSQL (disabled - using external) ---
+postgresql:
+  enabled: false
+
+postgresqlha:
+  enabled: false
+
+# --- Postgres Backup (disabled) ---
+postgresBackup:
+  enabled: false
+
+# --- MinIO (only needed if backups are enabled) ---
+minio:
+  accessKey: ""
+  secretKey: ""
+  bucketName: backup
+  endpoint: "http://minio.snow.sigma2.no"
+
+# --- RabbitMQ ---
+# Deployed separately; credentials via K8s secret
+rabbitmq:
+  enabled: false
+  host: "rmq-rabbitmq"
+  secret:
+    name: "waldur-rmq"
+    usernameKey: "rabbitmq-username"
+    passwordKey: "rabbitmq-password"
+
+# --- Global ---
+global:
+  imageRegistry: "docker.io"
+  security:
+    allowInsecureImages: true

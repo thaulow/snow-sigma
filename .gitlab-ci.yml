@@ -1,234 +1,70 @@
-include:
-  - project: "waldur/waldur-pipelines"
-    file: "/templates/stages.yml"
-  - project: "waldur/waldur-pipelines"
-    file: "/templates/test/check-merge-compatibility.yml"
-  - project: "waldur/waldur-pipelines"
-    file: "/templates/test/lint-md-files.yml"
+# Sigma2 Snow Deployment Pipeline
+# ==================================
+# Deploys Waldur (snow.sigma2.no) from the local chart (waldur/) with Sigma2 values.
+#
+# Stages:
+#   test   - Lint and validate the chart (runs on MR and main)
+#   deploy - Deploy/upgrade to the cluster (manual, main only)
 
-Run linter:
-  image:
-    name: "registry.hpc.ut.ee/mirror/alpine/helm:3.12.3"
-    entrypoint: [""]
+image: sigma2as/nird-deploy:latest
+
+variables:
+  KUBE_NAMESPACE: snow-ns9999k
+
+stages:
+  - test
+  - deploy
+
+# ---------------------------------------------------------------------------
+# TEST STAGE
+# ---------------------------------------------------------------------------
+
+Lint chart:
   stage: test
-  interruptible: true
-  rules:
-    - if: '$SKIP_TESTS == "true" || $SKIP_TESTS == "yes"'
-      when: never
-    - if: '$CI_PIPELINE_SOURCE == "schedule"'
-      when: never
-    - if: '$CI_COMMIT_BRANCH == "master"'
-    - if: $CI_COMMIT_TAG
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-  before_script:
-    - apk update
-    - apk add jq python3
-    - apk add -X http://dl-cdn.alpinelinux.org/alpine/edge/community -u alpine-keys
-    - apk add yq --repository=http://dl-cdn.alpinelinux.org/alpine/edge/community
   script:
     - helm dependency update waldur/
     - helm lint waldur/
-    - helm lint waldur/ -f waldur/test/values.yaml
-    # lint for correctness of known configuration
-    - mkdir rendered-templates && helm template waldur -f waldur/test/values.yaml --output-dir rendered-templates/ --debug
-    - yq e '.data."features.json"' rendered-templates/waldur/templates/config-features-json.yml | jq
-    - yq e '.data."override.conf.py"' rendered-templates/waldur/templates/config-override.yaml > rendered-templates/waldur/templates/override.conf.py
-    - python3 -m py_compile rendered-templates/waldur/templates/override.conf.py
-  artifacts:
-    expire_in: 1 week
-    when: always
-    paths:
-      - rendered-templates
-
-.Test template:
-  image: $HELM_TEST_IMAGE
-  stage: test
-  interruptible: true
-  before_script:
-    - export KUBECONFIG=${K8S_CONFIG_WALDUR_HELM_TEST}
-    - apk update
-    - apk add curl git
-    - kubectl config view
-    - kubectl config current-context
-    - helm repo add stable https://charts.helm.sh/stable
-    - helm repo add bitnami https://charts.bitnami.com/bitnami
-    - helm repo update
-    - helm dependency update waldur/
-
-.Cleanup template:
-  image: $HELM_TEST_IMAGE
-  script:
-    - export KUBECONFIG=${K8S_CONFIG_WALDUR_HELM_TEST}
-    - helm uninstall waldur || true
-    - kubectl delete job waldur-mastermind-init-whitelabeling-job || true
-
-Validate release installation (dry-run):
-  extends: .Test template
-  rules:
-    - if: '$SKIP_TESTS == "true"'
-      when: never
-    - if: '$CI_PIPELINE_SOURCE == "schedule"'
-      when: never
-    - if: '$CI_COMMIT_BRANCH == "master"'
-    - if: $CI_COMMIT_TAG
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-  script:
-    - helm install waldur waldur/ -f waldur/test/values.yaml --dry-run --debug
-
-Test release installation and readiness:
-  extends: .Test template
+    - helm lint waldur/ -f values.yaml
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-      changes:
-        - waldur/**/*
-    - if: '$CI_COMMIT_BRANCH == "master" && $CI_PIPELINE_SOURCE == "schedule"'
-      changes:
-        - waldur/**/*
-    - if: $TRIGGER_PROJECT_NAME
-      changes:
-        - waldur/**/*
-  script:
-    - set -xv
-    - helm dep update waldur/
-    - helm install waldur waldur/ --wait -f waldur/test/values.yaml --set waldur.pullPolicy=Always --timeout 20m0s
-  after_script:
-    - set -xv
-    - export KUBECONFIG=${K8S_CONFIG_WALDUR_HELM_TEST}
-    - helm list
-    - kubectl apply -f waldur/test/k8s/networkpolicy-override.yaml
-    - kubectl delete networkpolicy namespace-isolation --ignore-not-found
-    - kubectl get pods
-    - |
-      for NAME in $(kubectl get pods -l app.kubernetes.io/instance=waldur --field-selector status.phase!=Running -o name); do
-        echo "Pod name: $NAME"
-        echo "Status: $(kubectl get pod $NAME -o jsonpath={.status.phase})"
-        kubectl logs $NAME --tail 100 --all-containers
-        echo ----
-      done
+    - if: '$CI_COMMIT_BRANCH == "main"'
+  tags:
+    - sp
 
-.Test ArgoCD template:
-  image: registry.hpc.ut.ee/iljatest/docker:24.0.6
-  variables:
-    APPLICATION_NAME: waldur-helm-$CI_MERGE_REQUEST_IID
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-      changes:
-        - waldur/**/*
-      when: never
-  before_script:
-    - echo 'PasswordAuthentication no' >> /etc/ssh/ssh_config
-    - cat /etc/ssh/ssh_config
-    - SSH_COMMAND="ssh -i .ssh/id_waldur_dev_ssh_pkey -o PasswordAuthentication=no -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null rocky@172.17.89.30"
-    - SCP_COMMAND="scp -i .ssh/id_waldur_dev_ssh_pkey -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
-    - mkdir -p .ssh
-    - cp -vf $WALDUR_DEV_SSH_PKEY .ssh/id_waldur_dev_ssh_pkey
-    - cp -vf $WALDUR_DEV_SSH_PUBKEY .ssh/id_waldur_dev_ssh_pkey.pub
-    - chmod 600 .ssh/id_waldur_dev_ssh_pkey
-  after_script:
-    - rm -fv .ssh/id_waldur_dev_ssh_pkey .ssh/id_waldur_dev_ssh_pkey.pub
-
-Test ArgoCD sync:
-  extends: .Test ArgoCD template
+Validate dry-run:
   stage: test
   script:
-    - echo ${APPLICATION_NAME}
-    - $SSH_COMMAND "argocd login 10.43.40.117:80 --username $ARGOCD_USERNAME --password $ARGOCD_PASSWORD --name default --insecure"
-    - $SSH_COMMAND "argocd account get-user-info"
-    - $SSH_COMMAND "argocd app list"
-    - $SSH_COMMAND "argocd repo add https://code.opennodecloud.com/waldur/waldur-helm.git --username gitlab-ci-token --password $CI_JOB_TOKEN --upsert"
-    - $SSH_COMMAND "argocd app sync $APPLICATION_NAME --timeout 2400 --prune"
-    - $SSH_COMMAND "argocd app wait $APPLICATION_NAME"
-    - $SSH_COMMAND "argocd repo rm https://code.opennodecloud.com/waldur/waldur-helm.git"
-
-Cleanup previous test deployment:
-  extends: .Cleanup template
-  stage: .pre
+    - helm dependency update waldur/
+    - helm template waldur waldur/ -f values.yaml --debug > /dev/null
+    - helm install waldur waldur/ -f values.yaml --dry-run --debug -n $KUBE_NAMESPACE
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-    - if: '$CI_COMMIT_BRANCH == "master" && $CI_PIPELINE_SOURCE == "schedule"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+  tags:
+    - sp
 
-Publish new chart version and update docs on github:
-  image:
-    name: registry.hpc.ut.ee/mirror/alpine/helm:3.11.2
-    entrypoint: [""]
-  stage: release
-  rules:
-    - if: $CI_COMMIT_TAG
-  script:
-    # Configure git
-    - git remote -v
-    - git remote remove github-origin || true # Cleanup previous session
-    - git remote add github-origin https://opennode-jenkins:$OPENNODE_JENKINS_GITHUB_TOKEN@github.com/waldur/waldur-helm.git
-    - git remote -v
-    - git config user.name "Opennode Jenkins"
-    - git config user.email jenkins@opennodecloud.com
-    - git fetch github-origin
-    # Add version-specific docs
-    - cp README.md waldur/
-    - cp -r docs/ waldur/
-    # Add correct version to Chart.yaml
-    - |
-      sed -i -E -e "s/^version: ('.*'|.*)$/version: $CI_COMMIT_TAG/" waldur/Chart.yaml
-    - |
-      sed -i -E -e "s/^appVersion: ('.*'|.*)$/appVersion: \"$CI_COMMIT_TAG\"/" waldur/Chart.yaml
-    # Update Mastermind image tag
-    - |
-      sed -i -E -e "s/^  imageTag: \".*\"$/  imageTag: \"$CI_COMMIT_TAG\"/" waldur/values.yaml
-    # Update Homeport image tag
-    - |
-      sed -i -E -e "/^  homeport:$/{n;n;s/^    imageTag: \".*\"$/    imageTag: \"$CI_COMMIT_TAG\"/}" waldur/values.yaml
-    # Package Waldur chart with a new version
-    - helm dependency update waldur/
-    - helm package waldur/
-    - ls waldur-*.tgz
-    - git status
-    - git stash
-    # Checkout to gh-pages branch
-    - git checkout gh-pages
-    - git pull github-origin gh-pages
-    # Update docs
-    - git checkout $CI_COMMIT_TAG -- README.md
-    - git checkout $CI_COMMIT_TAG -- docs/
-    - git add README.md
-    - git add docs/
-    # Move archive to directory and update index
-    - mkdir charts/ || true
-    - mv waldur-$CI_COMMIT_TAG.tgz charts/
-    - helm repo index .
-    - git add charts/
-    - git add index.yaml
-    # Push changes
-    - git status
-    - git commit -m "Release $CI_COMMIT_TAG"
-    - git push github-origin gh-pages
+# ---------------------------------------------------------------------------
+# DEPLOY STAGE
+# ---------------------------------------------------------------------------
 
-Check for deprecated Kubernetes resources:
-  stage: test
-  image:
-    name: "registry.hpc.ut.ee/mirror/alpine/helm:3.14.2"
-    entrypoint: [""]
-  rules:
-    - if: '$SKIP_TESTS == "true"'
-      when: never
-    - if: '$CI_PIPELINE_SOURCE == "schedule"'
-      when: never
-    - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"
-    - if: $CI_COMMIT_TAG
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+Deploy waldur:
+  stage: deploy
   script:
-    - wget https://github.com/FairwindsOps/pluto/releases/download/v5.19.0/pluto_5.19.0_linux_amd64.tar.gz
-    - tar -xf pluto_5.19.0_linux_amd64.tar.gz
-    - mv pluto /usr/bin/
+    - kubectl config get-contexts
+    - kubectl config use-context nird/lmd-agent:lmd-agent
     - helm dependency update waldur/
-    - helm template waldur | pluto detect --target-versions k8s=v1.18.0 -v 5 -
-    - helm template waldur | pluto detect --target-versions k8s=v1.19.0 -v 5 -
-    - helm template waldur | pluto detect --target-versions k8s=v1.20.0 -v 5 -
-    - helm template waldur | pluto detect --target-versions k8s=v1.21.0 -v 5 -
-    - helm template waldur | pluto detect --target-versions k8s=v1.22.0 -v 5 -
-    - helm template waldur | pluto detect --target-versions k8s=v1.23.0 -v 5 -
-    - helm template waldur | pluto detect --target-versions k8s=v1.24.0 -v 5 -
-    - helm template waldur | pluto detect --target-versions k8s=v1.25.0 -v 5 -
-    - helm template waldur | pluto detect --target-versions k8s=v1.26.0 -v 5 -
-    - helm template waldur | pluto detect --target-versions k8s=v1.27.0 -v 5 -
-    - helm template waldur | pluto detect --target-versions k8s=v1.28.0 -v 5 -
-    - helm template waldur | pluto detect --target-versions k8s=v1.29.0 -v 5 -
+    - kubectl delete job waldur-mastermind-init-whitelabeling-job -n $KUBE_NAMESPACE || true
+    - kubectl delete job load-features-job -n $KUBE_NAMESPACE || true
+    - helm upgrade --install waldur waldur/ -f values.yaml -n $KUBE_NAMESPACE --timeout 10m0s
+    - kubectl rollout restart deployment waldur-mastermind-beat -n $KUBE_NAMESPACE
+    - kubectl rollout restart deployment waldur-mastermind-api -n $KUBE_NAMESPACE
+    - kubectl rollout restart deployment waldur-mastermind-worker -n $KUBE_NAMESPACE
+    - kubectl rollout restart deployment waldur-homeport -n $KUBE_NAMESPACE
+  environment:
+    name: production
+    url: https://snow.sigma2.no
+  when: manual
+  only:
+    - main
+  tags:
+    - sp
