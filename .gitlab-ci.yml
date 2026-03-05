@@ -4,7 +4,6 @@
 #
 # Stages:
 #   test   - Lint and validate the chart (runs on MR and main)
-#   setup  - One-time cluster setup jobs (manual, main only)
 #   deploy - Deploy/upgrade to the cluster (manual, main only)
 #
 # Required GitLab CI variables (Settings > CI/CD > Variables):
@@ -16,11 +15,9 @@ image: sigma2as/nird-deploy:latest
 
 variables:
   KUBE_NAMESPACE: snow-ns9999k
-  SOURCE_NAMESPACE: waldur-ns9999k
 
 stages:
   - test
-  - setup
   - deploy
 
 # ---------------------------------------------------------------------------
@@ -50,28 +47,6 @@ Validate templates:
   tags:
     - sp
 
-# ---------------------------------------------------------------------------
-# SETUP STAGE (one-time, manual)
-# Run once before the first deploy.
-# ---------------------------------------------------------------------------
-
-.setup-common: &setup-common
-  stage: setup
-  before_script:
-    - kubectl config use-context nird/lmd-agent:lmd-agent
-  when: manual
-  only:
-    - main
-  tags:
-    - sp
-
-Copy wildcard TLS secret:
-  <<: *setup-common
-  script:
-    # Copy wildcard TLS certificate from the source namespace (python3 used to avoid jq dependency)
-    - kubectl get secret wildcard-tls -n $SOURCE_NAMESPACE -o json > /tmp/secret.json
-    - python3 -c "import json,sys; s=json.load(open('/tmp/secret.json')); [s['metadata'].pop(k,None) for k in ('resourceVersion','uid','creationTimestamp','annotations','managedFields')]; s['metadata']['namespace']='$KUBE_NAMESPACE'; print(json.dumps(s))" > /tmp/secret-patched.json
-    - kubectl apply -f /tmp/secret-patched.json
 
 # ---------------------------------------------------------------------------
 # DEPLOY STAGE
