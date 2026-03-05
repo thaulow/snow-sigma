@@ -38,10 +38,10 @@ apiResources:
 workerResources:
   requests:
     cpu: 200m
-    memory: 1Gi
+    memory: 2Gi
   limits:
     cpu: 400m
-    memory: 2Gi
+    memory: 4Gi
 
 homeportResources:
   requests:
