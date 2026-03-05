@@ -192,8 +192,8 @@ externalDB:
   enabled: true
   secretName: "snow-db"           # K8s secret with key: password (created by NIRD)
   serviceName: "snow-ns9999k-snow.pgsql.svc"
-  database: "waldur"
-  username: "waldur"
+  database: "snow"
+  username: "snow"
 
 # --- PostgreSQL (disabled - using external) ---
 postgresql:
