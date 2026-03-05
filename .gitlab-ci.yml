@@ -11,7 +11,6 @@
 #   WALDUR_SECRET_KEY  - Django secret key            (masked, protected)
 #   RMQ_PASSWORD       - RabbitMQ password            (masked, protected)
 #   DB_PASSWORD        - PostgreSQL password          (masked, protected)
-#   DB_USERNAME        - PostgreSQL username          (masked, protected)
 
 image: sigma2as/nird-deploy:latest
 
@@ -89,17 +88,25 @@ Create waldur secret key:
         -n $KUBE_NAMESPACE \
         --dry-run=client -o yaml | kubectl apply -f -
 
-Create snow-db secret:
+Create postgres credentials:
   <<: *setup-common
-  # Run this after PostgreSQL is provisioned and you know the credentials.
-  # Set DB_USERNAME and DB_PASSWORD as GitLab CI variables first.
+  # Creates the bootstrap secret CloudNativePG uses to initialise the database.
+  # Must run before "Deploy PostgreSQL".
   script:
     - |
-      kubectl create secret generic snow-db \
-        --from-literal=username="$DB_USERNAME" \
+      kubectl create secret generic snow-postgres-credentials \
+        --from-literal=username="waldur" \
         --from-literal=password="$DB_PASSWORD" \
         -n $KUBE_NAMESPACE \
         --dry-run=client -o yaml | kubectl apply -f -
+
+Deploy PostgreSQL:
+  <<: *setup-common
+  # Applies the CloudNativePG Cluster manifest.
+  # Requires the CloudNativePG operator to be installed on the cluster.
+  # After this runs, the operator creates the snow-postgres-app secret automatically.
+  script:
+    - kubectl apply -f postgres.yaml
 
 # ---------------------------------------------------------------------------
 # DEPLOY STAGE
