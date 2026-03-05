@@ -200,7 +200,6 @@ networkPolicy:
 # --- External Database (Zalando PostgreSQL) ---
 externalDB:
   enabled: true
-  flavor: "zalando"
   secretName: "snow-db"
   serviceName: "snow-ns9999k-snow.pgsql.svc"
 
