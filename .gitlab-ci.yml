@@ -60,6 +60,9 @@ Deploy waldur:
     - helm dependency update waldur/
     - kubectl delete job waldur-mastermind-init-whitelabeling-job -n $KUBE_NAMESPACE || true
     - kubectl delete job load-features-job -n $KUBE_NAMESPACE || true
+    # Unlock any stuck Helm release before upgrading
+    - kubectl delete secret -n $KUBE_NAMESPACE -l owner=helm,name=waldur,status=pending-install || true
+    - kubectl delete secret -n $KUBE_NAMESPACE -l owner=helm,name=waldur,status=pending-upgrade || true
     - |
       helm upgrade --install waldur waldur/ \
         -f values.yaml \
