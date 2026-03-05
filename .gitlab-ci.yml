@@ -68,11 +68,10 @@ Validate templates:
 Copy wildcard TLS secret:
   <<: *setup-common
   script:
-    # Copy wildcard TLS certificate from the source namespace
-    - |
-      kubectl get secret wildcard-tls -n $SOURCE_NAMESPACE -o json \
-        | jq 'del(.metadata.resourceVersion, .metadata.uid, .metadata.creationTimestamp, .metadata.annotations, .metadata.managedFields) | .metadata.namespace = "'$KUBE_NAMESPACE'"' \
-        | kubectl apply -f -
+    # Copy wildcard TLS certificate from the source namespace (python3 used to avoid jq dependency)
+    - kubectl get secret wildcard-tls -n $SOURCE_NAMESPACE -o json > /tmp/secret.json
+    - python3 -c "import json,sys; s=json.load(open('/tmp/secret.json')); [s['metadata'].pop(k,None) for k in ('resourceVersion','uid','creationTimestamp','annotations','managedFields')]; s['metadata']['namespace']='$KUBE_NAMESPACE'; print(json.dumps(s))" > /tmp/secret-patched.json
+    - kubectl apply -f /tmp/secret-patched.json
 
 # ---------------------------------------------------------------------------
 # DEPLOY STAGE
