@@ -41,7 +41,7 @@ workerResources:
     memory: 1Gi
   limits:
     cpu: 400m
-    memory: 3Gi
+    memory: 2Gi
 
 homeportResources:
   requests:
