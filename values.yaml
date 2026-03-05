@@ -207,6 +207,8 @@ postgresql:
       limits:
         memory: "2Gi"
         cpu: "1000m"
+  volumePermissions:
+    enabled: true  # Fixes NFS permission issues by running chown as root init container
   image:
     repository: bitnamilegacy/postgresql
     tag: "16.4.0-debian-12-r19"
