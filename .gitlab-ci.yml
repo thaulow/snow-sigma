@@ -52,7 +52,7 @@ Validate templates:
 
 # ---------------------------------------------------------------------------
 # SETUP STAGE (one-time, manual)
-# Run these once before the first deploy.
+# Run once before the first deploy.
 # ---------------------------------------------------------------------------
 
 .setup-common: &setup-common
@@ -65,48 +65,14 @@ Validate templates:
   tags:
     - sp
 
-Copy cluster secrets:
+Copy wildcard TLS secret:
   <<: *setup-common
   script:
-    # Copy wildcard TLS certificate
+    # Copy wildcard TLS certificate from the source namespace
     - |
       kubectl get secret wildcard-tls -n $SOURCE_NAMESPACE -o json \
         | jq 'del(.metadata.resourceVersion, .metadata.uid, .metadata.creationTimestamp, .metadata.annotations, .metadata.managedFields) | .metadata.namespace = "'$KUBE_NAMESPACE'"' \
         | kubectl apply -f -
-    # Copy Docker registry credentials
-    - |
-      kubectl get secret sigma2asregistry -n $SOURCE_NAMESPACE -o json \
-        | jq 'del(.metadata.resourceVersion, .metadata.uid, .metadata.creationTimestamp, .metadata.annotations, .metadata.managedFields) | .metadata.namespace = "'$KUBE_NAMESPACE'"' \
-        | kubectl apply -f -
-
-Create waldur secret key:
-  <<: *setup-common
-  script:
-    - |
-      kubectl create secret generic waldur-secret-key \
-        --from-literal=GLOBAL_SECRET_KEY="$WALDUR_SECRET_KEY" \
-        -n $KUBE_NAMESPACE \
-        --dry-run=client -o yaml | kubectl apply -f -
-
-Create postgres credentials:
-  <<: *setup-common
-  # Creates the bootstrap secret CloudNativePG uses to initialise the database.
-  # Must run before "Deploy PostgreSQL".
-  script:
-    - |
-      kubectl create secret generic snow-postgres-credentials \
-        --from-literal=username="waldur" \
-        --from-literal=password="$DB_PASSWORD" \
-        -n $KUBE_NAMESPACE \
-        --dry-run=client -o yaml | kubectl apply -f -
-
-Deploy PostgreSQL:
-  <<: *setup-common
-  # Applies the CloudNativePG Cluster manifest.
-  # Requires the CloudNativePG operator to be installed on the cluster.
-  # After this runs, the operator creates the snow-postgres-app secret automatically.
-  script:
-    - kubectl apply -f postgres.yaml
 
 # ---------------------------------------------------------------------------
 # DEPLOY STAGE
@@ -123,6 +89,8 @@ Deploy waldur:
     - |
       helm upgrade --install waldur waldur/ \
         -f values.yaml \
+        --set waldur.secretKey="$WALDUR_SECRET_KEY" \
+        --set postgresql.auth.password="$DB_PASSWORD" \
         --set rabbitmq.auth.password="$RMQ_PASSWORD" \
         -n $KUBE_NAMESPACE \
         --timeout 10m0s
