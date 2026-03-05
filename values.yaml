@@ -186,30 +186,19 @@ waldur:
 networkPolicy:
   enabled: false
 
-# --- External Database (disabled - using bundled PostgreSQL) ---
+# --- External Database (NIRD-managed PostgreSQL) ---
+# Thierry provisions the PostgreSQL service via NIRD Toolkit.
+# The snow-db secret is created by the deploy job from $DB_PASSWORD.
 externalDB:
-  enabled: false
-
-# --- PostgreSQL (bundled Bitnami chart) ---
-postgresql:
   enabled: true
-  auth:
-    username: "waldur"
-    password: ""  # Set via --set postgresql.auth.password=$DB_PASSWORD at deploy time
-    database: "waldur"
-  primary:
-    persistence:
-      existingClaim: "c13f2ee2-e450-42da-91ab-f90ab787aaf2"
-    resources:
-      requests:
-        memory: "1Gi"
-        cpu: "500m"
-      limits:
-        memory: "2Gi"
-        cpu: "1000m"
-  image:
-    repository: bitnamilegacy/postgresql
-    tag: "16.4.0-debian-12-r19"
+  secretName: "snow-db"           # K8s secret with key: password
+  serviceName: "snow-ns9999k-snow.pgsql.svc"
+  database: "waldur"
+  username: "waldur"
+
+# --- PostgreSQL (disabled - using external) ---
+postgresql:
+  enabled: false
 
 postgresqlha:
   enabled: false

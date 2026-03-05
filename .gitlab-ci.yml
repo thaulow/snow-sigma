@@ -63,11 +63,16 @@ Deploy waldur:
     # Unlock any stuck Helm release before upgrading
     - kubectl delete secret -n $KUBE_NAMESPACE -l owner=helm,name=waldur,status=pending-install || true
     - kubectl delete secret -n $KUBE_NAMESPACE -l owner=helm,name=waldur,status=pending-upgrade || true
+    # Create/update the external DB secret
+    - |
+      kubectl create secret generic snow-db \
+        --from-literal=password="$DB_PASSWORD" \
+        -n $KUBE_NAMESPACE \
+        --dry-run=client -o yaml | kubectl apply -f -
     - |
       helm upgrade --install waldur waldur/ \
         -f values.yaml \
         --set waldur.secretKey="$WALDUR_SECRET_KEY" \
-        --set postgresql.auth.password="$DB_PASSWORD" \
         --set rabbitmq.auth.password="$RMQ_PASSWORD" \
         -n $KUBE_NAMESPACE \
         --timeout 10m0s
