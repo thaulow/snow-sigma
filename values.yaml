@@ -3,26 +3,20 @@
 # This file overrides the upstream waldur/values.yaml for the Sigma2 cluster.
 # Deployment: snow.sigma2.no (namespace: snow-ns9999k)
 #
-# Pre-requisite Kubernetes Secrets (must exist in namespace before deploy):
+# Pre-requisite Kubernetes Secrets (created by the CI setup jobs below):
 #
-#   1. waldur-secret-key    - Django secret key
-#      Keys: GLOBAL_SECRET_KEY
+#   1. waldur-secret-key    - Django secret key (from GitLab variable WALDUR_SECRET_KEY)
+#   2. snow-db              - PostgreSQL credentials (from GitLab variable DB_PASSWORD)
+#   3. wildcard-tls         - Copied from waldur-ns9999k by CI setup job
+#   4. sigma2asregistry     - Copied from waldur-ns9999k by CI setup job
 #
-#   2. snow-db               - PostgreSQL credentials (created by Zalando operator)
-#      Keys: username, password
+# RabbitMQ credentials are managed by Helm (GitLab variable RMQ_PASSWORD).
 #
-#   3. waldur-rmq            - RabbitMQ credentials
-#      Keys: rabbitmq-username, rabbitmq-password
-#
-#   4. snow-tls              - TLS certificate for snow.sigma2.no
-#      Keys: tls.crt, tls.key
-#
-# To create secrets (example):
-#   kubectl create secret generic waldur-secret-key \
-#     --from-literal=GLOBAL_SECRET_KEY='<your-secret-key>' -n snow-ns9999k
-#   kubectl create secret generic waldur-rmq \
-#     --from-literal=rabbitmq-username='waldur' \
-#     --from-literal=rabbitmq-password='<your-password>' -n snow-ns9999k
+# Required GitLab CI variables (Settings > CI/CD > Variables):
+#   WALDUR_SECRET_KEY  - Django secret key (masked, protected)
+#   RMQ_PASSWORD       - RabbitMQ password (masked, protected)
+#   DB_PASSWORD        - PostgreSQL password (masked, protected)
+#   DB_USERNAME        - PostgreSQL username (masked, protected)
 # ========================================
 
 # --- Replicas ---
@@ -84,8 +78,8 @@ ingress:
   tls:
     enabled: true
     source: "secret"
-    customMastermindSecretName: "snow-tls"
-    customHomeportSecretName: "snow-tls"
+    customMastermindSecretName: "wildcard-tls"
+    customHomeportSecretName: "wildcard-tls"
 
 # --- Waldur Core ---
 waldur:
@@ -229,14 +223,29 @@ minio:
   endpoint: "http://minio.snow.sigma2.no"
 
 # --- RabbitMQ ---
-# Deployed separately; credentials via K8s secret
+# Managed by Helm. Password passed via --set rabbitmq.auth.password=$RMQ_PASSWORD at deploy time.
 rabbitmq:
-  enabled: false
-  host: "rmq-rabbitmq"
-  secret:
-    name: "waldur-rmq"
-    usernameKey: "rabbitmq-username"
-    passwordKey: "rabbitmq-password"
+  enabled: true
+  auth:
+    username: "waldur"
+    password: ""  # Set via GitLab CI variable RMQ_PASSWORD
+  image:
+    registry: "docker.io"
+    repository: "bitnamilegacy/rabbitmq"
+    tag: "4.1.3-debian-12-r1"
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 1
+      memory: 512Mi
+    limits:
+      cpu: 2
+      memory: 1Gi
+  persistence:
+    enabled: true
+    size: "10Gi"
+  clustering:
+    forceBoot: true
 
 # --- Global ---
 global:

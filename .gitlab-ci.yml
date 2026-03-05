@@ -4,15 +4,24 @@
 #
 # Stages:
 #   test   - Lint and validate the chart (runs on MR and main)
+#   setup  - One-time cluster setup jobs (manual, main only)
 #   deploy - Deploy/upgrade to the cluster (manual, main only)
+#
+# Required GitLab CI variables (Settings > CI/CD > Variables):
+#   WALDUR_SECRET_KEY  - Django secret key            (masked, protected)
+#   RMQ_PASSWORD       - RabbitMQ password            (masked, protected)
+#   DB_PASSWORD        - PostgreSQL password          (masked, protected)
+#   DB_USERNAME        - PostgreSQL username          (masked, protected)
 
 image: sigma2as/nird-deploy:latest
 
 variables:
   KUBE_NAMESPACE: snow-ns9999k
+  SOURCE_NAMESPACE: waldur-ns9999k
 
 stages:
   - test
+  - setup
   - deploy
 
 # ---------------------------------------------------------------------------
@@ -43,6 +52,56 @@ Validate templates:
     - sp
 
 # ---------------------------------------------------------------------------
+# SETUP STAGE (one-time, manual)
+# Run these once before the first deploy.
+# ---------------------------------------------------------------------------
+
+.setup-common: &setup-common
+  stage: setup
+  before_script:
+    - kubectl config use-context nird/lmd-agent:lmd-agent
+  when: manual
+  only:
+    - main
+  tags:
+    - sp
+
+Copy cluster secrets:
+  <<: *setup-common
+  script:
+    # Copy wildcard TLS certificate
+    - |
+      kubectl get secret wildcard-tls -n $SOURCE_NAMESPACE -o json \
+        | jq 'del(.metadata.resourceVersion, .metadata.uid, .metadata.creationTimestamp, .metadata.annotations, .metadata.managedFields) | .metadata.namespace = "'$KUBE_NAMESPACE'"' \
+        | kubectl apply -f -
+    # Copy Docker registry credentials
+    - |
+      kubectl get secret sigma2asregistry -n $SOURCE_NAMESPACE -o json \
+        | jq 'del(.metadata.resourceVersion, .metadata.uid, .metadata.creationTimestamp, .metadata.annotations, .metadata.managedFields) | .metadata.namespace = "'$KUBE_NAMESPACE'"' \
+        | kubectl apply -f -
+
+Create waldur secret key:
+  <<: *setup-common
+  script:
+    - |
+      kubectl create secret generic waldur-secret-key \
+        --from-literal=GLOBAL_SECRET_KEY="$WALDUR_SECRET_KEY" \
+        -n $KUBE_NAMESPACE \
+        --dry-run=client -o yaml | kubectl apply -f -
+
+Create snow-db secret:
+  <<: *setup-common
+  # Run this after PostgreSQL is provisioned and you know the credentials.
+  # Set DB_USERNAME and DB_PASSWORD as GitLab CI variables first.
+  script:
+    - |
+      kubectl create secret generic snow-db \
+        --from-literal=username="$DB_USERNAME" \
+        --from-literal=password="$DB_PASSWORD" \
+        -n $KUBE_NAMESPACE \
+        --dry-run=client -o yaml | kubectl apply -f -
+
+# ---------------------------------------------------------------------------
 # DEPLOY STAGE
 # ---------------------------------------------------------------------------
 
@@ -54,7 +113,12 @@ Deploy waldur:
     - helm dependency update waldur/
     - kubectl delete job waldur-mastermind-init-whitelabeling-job -n $KUBE_NAMESPACE || true
     - kubectl delete job load-features-job -n $KUBE_NAMESPACE || true
-    - helm upgrade --install waldur waldur/ -f values.yaml -n $KUBE_NAMESPACE --timeout 10m0s
+    - |
+      helm upgrade --install waldur waldur/ \
+        -f values.yaml \
+        --set rabbitmq.auth.password="$RMQ_PASSWORD" \
+        -n $KUBE_NAMESPACE \
+        --timeout 10m0s
     - kubectl rollout restart deployment waldur-mastermind-beat -n $KUBE_NAMESPACE
     - kubectl rollout restart deployment waldur-mastermind-api -n $KUBE_NAMESPACE
     - kubectl rollout restart deployment waldur-mastermind-worker -n $KUBE_NAMESPACE
