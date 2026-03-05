@@ -187,11 +187,10 @@ networkPolicy:
   enabled: false
 
 # --- External Database (NIRD-managed PostgreSQL) ---
-# Thierry provisions the PostgreSQL service via NIRD Toolkit.
-# The snow-db secret is created by the deploy job from $DB_PASSWORD.
+# Provisioned by NIRD/Thierry. Secret managed externally, not by this pipeline.
 externalDB:
   enabled: true
-  secretName: "snow-db"           # K8s secret with key: password
+  secretName: "snow-db"           # K8s secret with key: password (created by NIRD)
   serviceName: "snow-ns9999k-snow.pgsql.svc"
   database: "waldur"
   username: "waldur"
