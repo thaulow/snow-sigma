@@ -73,8 +73,8 @@ ingress:
   tls:
     enabled: true
     source: "secret"
-    customMastermindSecretName: "wildcard-tls"
-    customHomeportSecretName: "wildcard-tls"
+    customMastermindSecretName: "snow-tls"
+    customHomeportSecretName: "snow-tls"
 
 # --- Waldur Core ---
 waldur:
