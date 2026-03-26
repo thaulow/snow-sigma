@@ -102,7 +102,7 @@ waldur:
 
   notificationSubject: "Sigma2 Snow Notification"
   timeZone: "UTC"
-  features: []
+  features: [show_service_accounts]
   currencyName: "NOK"
 
   # --- Site ---
