@@ -170,6 +170,7 @@ waldur:
   # --- Homeport ---
   homeport:
     imageName: "opennode/waldur-homeport"
+    imageTag: "8.0.7-rc.27"
     docsLink: "https://www.sigma2.no/documentation/"
 
   # --- Disabled features ---
