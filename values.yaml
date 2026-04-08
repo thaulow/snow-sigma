@@ -79,7 +79,7 @@ ingress:
 # --- Waldur Core ---
 waldur:
   imageName: "opennode/waldur-mastermind"
-  imageTag: "8.0.7-rc.8"
+  imageTag: "8.0.7-rc.17"
   initdbEnabled: true
   initdbImageName: "bitnamilegacy/postgresql"
   pullPolicy: IfNotPresent
@@ -162,7 +162,7 @@ waldur:
     modePageTitle: "Sigma2 Snow"
     loginLogoPath: "https://snow.sigma2.no/api/icons/login_logo/"
     sidebarLogoPath: "https://snow.sigma2.no/api/icons/sidebar_logo_dark/"
-    sidebarStyle: "accent"
+    sidebarStyle: "primary"
     poweredByLogoPath: "https://snow.sigma2.no/api/icons/powered_by_logo/"
     faviconPath: "https://snow.sigma2.no/api/icons/favicon"
     brandColor: "#007890"
