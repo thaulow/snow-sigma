@@ -79,7 +79,7 @@ ingress:
 # --- Waldur Core ---
 waldur:
   imageName: "opennode/waldur-mastermind"
-  imageTag: "8.0.7-rc.27"
+  imageTag: "8.0.7"
   initdbEnabled: true
   initdbImageName: "bitnamilegacy/postgresql"
   pullPolicy: IfNotPresent
@@ -170,7 +170,7 @@ waldur:
   # --- Homeport ---
   homeport:
     imageName: "opennode/waldur-homeport"
-    imageTag: "8.0.7-rc.27"
+    imageTag: "8.0.7"
     docsLink: "https://www.sigma2.no/documentation/"
 
   # --- Disabled features ---
