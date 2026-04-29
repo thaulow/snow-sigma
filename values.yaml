@@ -162,10 +162,10 @@ waldur:
     modePageTitle: "Sigma2 Snow"
     loginLogoPath: "https://snow.sigma2.no/api/icons/login_logo/"
     sidebarLogoPath: "https://snow.sigma2.no/api/icons/sidebar_logo_dark/"
-    sidebarStyle: "primary"
+    sidebarStyle: "light"
     poweredByLogoPath: "https://snow.sigma2.no/api/icons/powered_by_logo/"
     faviconPath: "https://snow.sigma2.no/api/icons/favicon"
-    brandColor: "#007890"
+    brandColor: "#000000"
 
   # --- Homeport ---
   homeport:
