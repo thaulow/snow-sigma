@@ -36,9 +36,10 @@ spec:
             httpGet:
               port: 8080
               path: /api/configuration/
-            initialDelaySeconds: 60
+            initialDelaySeconds: 120
             periodSeconds: 30
             failureThreshold: 5
+            timeoutSeconds: 10
           readinessProbe:
             httpGet:
               port: 8080
