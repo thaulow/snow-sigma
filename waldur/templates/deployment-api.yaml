@@ -62,6 +62,8 @@ spec:
             - name: OPENPORTAL_CONFIG
               value: "/etc/waldur/openportal/config.toml"
             {{ end }}
+            - name: GUNICORN_CMD_ARGS
+              value: "--preload --workers 2"
           resources:
             {{ if .Values.hpa.api.enabled }}
             {{- toYaml .Values.hpa.api.resources | nindent 12 }}
