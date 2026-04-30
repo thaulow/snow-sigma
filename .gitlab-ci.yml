@@ -64,6 +64,8 @@ Deploy waldur:
     # Unlock any stuck Helm release before upgrading
     - kubectl delete secret -n $KUBE_NAMESPACE -l owner=helm,name=waldur,status=pending-install || true
     - kubectl delete secret -n $KUBE_NAMESPACE -l owner=helm,name=waldur,status=pending-upgrade || true
+    # Delete API deployment so Helm can recreate it (needed when probe type changes exec→httpGet)
+    - kubectl delete deployment waldur-mastermind-api -n $KUBE_NAMESPACE || true
     - |
       helm upgrade --install waldur waldur/ \
         -f values.yaml \
