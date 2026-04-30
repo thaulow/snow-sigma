@@ -47,6 +47,7 @@ spec:
             initialDelaySeconds: 50 # it takes around a minute to completely start UWSGI server
             periodSeconds: 10
             failureThreshold: 100 # Mastermind can wait long for DB migrations
+            timeoutSeconds: 10
           ports:
             - name: http
               containerPort: 8080
