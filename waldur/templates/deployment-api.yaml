@@ -33,12 +33,11 @@ spec:
           args:
             - "mastermind"
           livenessProbe:
-            exec:
-              command:
-                - pgrep
-                - gunicorn
-            initialDelaySeconds: 5 # it takes around 5 sec to spawn Gunicorn processes
-            periodSeconds: 5
+            httpGet:
+              port: 8080
+              path: /api/configuration/
+            initialDelaySeconds: 60
+            periodSeconds: 30
             failureThreshold: 5
           readinessProbe:
             httpGet:
