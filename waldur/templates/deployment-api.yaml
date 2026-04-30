@@ -36,7 +36,7 @@ spec:
             httpGet:
               port: 8080
               path: /api/configuration/
-            initialDelaySeconds: 120
+            initialDelaySeconds: 90
             periodSeconds: 30
             failureThreshold: 5
             timeoutSeconds: 10
@@ -124,6 +124,22 @@ spec:
               subPath: {{ with (dig "marketplace" "script" "kubeconfigSecret" (dict) .Values.waldur) }}{{ if and (get . "name") (get . "key") }}{{ get . "key" }}{{ else }}kubeconfig{{ end }}{{ else }}kubeconfig{{ end }}
               readOnly: true
             {{ end }}
+      initContainers:
+        - name: warm-module-cache
+          image: {{ .Values.global.imageRegistry }}/{{ .Values.waldur.imageName }}:{{ .Values.waldur.imageTag }}
+          imagePullPolicy: {{ include "waldur.imagePullPolicy" (dict "tag" .Values.waldur.imageTag "Values" .Values) }}
+          command:
+            - waldur
+            - check
+          env:
+            {{- include "waldur.credentials" . | nindent 12 }}
+          resources:
+            requests:
+              cpu: 200m
+              memory: 1Gi
+            limits:
+              cpu: 500m
+              memory: 2Gi
       volumes:
       - name: api-override
         configMap:
