@@ -458,6 +458,9 @@ data:
     WALDUR_CORE['INVITATION_LIFETIME'] = timedelta(weeks={{ default 1 .Values.waldur.invitationDuration.individual }})
     WALDUR_CORE['GROUP_INVITATION_LIFETIME'] = timedelta(weeks={{ default 1 .Values.waldur.invitationDuration.group }})
 
+    # Disable AI assistant — fastembed model download not available in this environment
+    AI_ASSISTANT_ENABLED = False
+
     # Added to handle CORS - see
     # https://github.com/waldur/waldur-homeport?tab=readme-ov-file#backend-configuration
     from corsheaders.defaults import default_headers
